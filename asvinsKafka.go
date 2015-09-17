@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-var producer sarama.SyncProducer
+var producer sarama.AsyncProducer
 var consumer sarama.Consumer
 
 // Setup must be called in order to initialize the kafka consumer and producer
@@ -38,7 +38,7 @@ func initProducer() {
 	config.Producer.Flush.Frequency = 500 * time.Millisecond
 
 	var err error
-	producer, err = sarama.NewSyncProducer(brokerList, config)
+	producer, err = sarama.NewAsyncProducer(brokerList, config)
 	if err != nil {
 		log.Fatalln("Faild to start KAFKA producer", err)
 	}
@@ -62,16 +62,10 @@ func initConsumer() {
 
 // Publish .. publish a message to the kafka server using the tag and message provided.
 func Publish(topic string, msg []byte) {
-	partition, offset, err := producer.SendMessage(&sarama.ProducerMessage{
+	producer.Input() <- &sarama.ProducerMessage{
 		Topic: topic,
 		Value: sarama.ByteEncoder(msg),
-	})
-
-	if err != nil {
-		fmt.Printf("Failed to publish message: %s, to topic: %s", msg, topic)
 	}
-
-	fmt.Printf("Message published to partition: %d, with offset: %d\n", partition, offset)
 }
 
 // Subscribe .. subscribe to a kafka topic.

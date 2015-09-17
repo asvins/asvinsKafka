@@ -19,7 +19,7 @@ func TestCase1(t *testing.T) {
 		fmt.Println("Message from TEST: ", string(msg))
 		nMsgs++
 
-		if nMsgs == 7 {
+		if nMsgs == maxMsgs {
 			fmt.Println(">> All messages were received.. DONE!")
 			done <- 1
 		}
