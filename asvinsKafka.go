@@ -10,16 +10,27 @@ import (
 var producer sarama.SyncProducer
 var consumer sarama.Consumer
 
-// Initialize producer and consumer dts
-func init() {
+// Setup must be called in order to initialize the kafka consumer and producer
+// acording to the config file
+func Setup() {
 	fmt.Println(">> Initilizing Kafka ")
 	initProducer()
 	initConsumer()
 	fmt.Println(">> Done!")
 }
 
+// TearDown must be called to properly close all Kafka connections
+func TearDown() {
+	if err := producer.Close(); err != nil {
+		fmt.Println(">> Unable to close Kafka Producer")
+	}
+
+	if err := consumer.Close(); err != nil {
+		fmt.Println(">> Unbale to close Kafka Consumer")
+	}
+}
+
 func initProducer() {
-	//TODO config e broker list from config file
 	brokerList := []string{"localhost:9092"}
 	config := sarama.NewConfig()
 	config.Producer.RequiredAcks = sarama.WaitForLocal // only wait for leader to ack
@@ -38,7 +49,7 @@ func initProducer() {
 func initConsumer() {
 	var err error
 	brokerList := []string{"localhost:9092"}
-	config := sarama.NewConfig() // TODO verify correct configs
+	config := sarama.NewConfig()
 
 	consumer, err = sarama.NewConsumer(brokerList, config)
 
@@ -49,10 +60,11 @@ func initConsumer() {
 	fmt.Println(">> kafka consumer initialized successfully")
 }
 
-func Publish(topic, msg string) {
+// Publish .. publish a message to the kafka server using the tag and message provided.
+func Publish(topic string, msg []byte) {
 	partition, offset, err := producer.SendMessage(&sarama.ProducerMessage{
 		Topic: topic,
-		Value: sarama.StringEncoder(msg),
+		Value: sarama.ByteEncoder(msg),
 	})
 
 	if err != nil {
@@ -62,7 +74,9 @@ func Publish(topic, msg string) {
 	fmt.Printf("Message published to partition: %d, with offset: %d\n", partition, offset)
 }
 
-func Subscribe(topic string, callback func(msg string)) {
+// Subscribe .. subscribe to a kafka topic.
+// the callback parameter is the function to be executed for the message received.
+func Subscribe(topic string, callback func(msg []byte)) {
 	partitions, err := consumer.Partitions(topic)
 
 	if err != nil {
@@ -75,7 +89,7 @@ func Subscribe(topic string, callback func(msg string)) {
 		c, err := consumer.ConsumePartition(topic, p, sarama.OffsetNewest)
 
 		if err != nil {
-			fmt.Println("DEU MERDA... TODO")
+			fmt.Println(">> ERROR: Unable to initialize ConsumerPartition for topic: ", topic)
 		}
 
 		// create goroutins to stay listening to new messages as long as the process stays up
@@ -83,7 +97,7 @@ func Subscribe(topic string, callback func(msg string)) {
 			for {
 				select {
 				case message := <-c.Messages():
-					callback(string(message.Value))
+					callback(message.Value)
 
 				case err := <-c.Errors():
 					fmt.Println(err)

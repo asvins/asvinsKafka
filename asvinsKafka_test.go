@@ -2,19 +2,33 @@ package asvinsKafka
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 )
 
 func TestCase1(t *testing.T) {
-	Subscribe("asvins_test", func(msg string) {
-		fmt.Println("Message from TEST: ", msg)
+	Setup()
+	defer TearDown()
+
+	done := make(chan int)
+
+	maxMsgs := 7
+	nMsgs := 0
+
+	Subscribe("asvins_test", func(msg []byte) {
+		fmt.Println("Message from TEST: ", string(msg))
+		nMsgs++
+
+		if nMsgs == 7 {
+			fmt.Println(">> All messages were received.. DONE!")
+			done <- 1
+		}
 	})
 
-	Publish("asvins_test", "Executin test 1")
-	Publish("asvins_test", "Executin test 2")
-	Publish("asvins_test", "Executin test 3")
-	Publish("asvins_test", "Executin test 4")
-	Publish("asvins_test", "Executin test 5")
-	Publish("asvins_test", "Executin test 6")
-	Publish("asvins_test", "Executin test 7")
+	for i := 0; i < maxMsgs; i++ {
+		Publish("asvins_test", []byte("Execution test"+strconv.Itoa(i+1)))
+	}
+
+	// Wait until all messages are handled by the subscriber
+	<-done
 }
