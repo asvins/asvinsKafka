@@ -43,6 +43,13 @@ func initProducer() {
 		log.Fatalln("Faild to start KAFKA producer", err)
 	}
 
+	//You must read from the Errors() channel or the producer will deadlock.
+	go func() {
+		for err := range producer.Errors() {
+			log.Println(">>Kadka producer Error: ", err)
+		}
+	}()
+
 	fmt.Println(">> kafka producer initialized successfully")
 }
 
