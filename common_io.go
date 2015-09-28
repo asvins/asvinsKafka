@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/Shopify/sarama"
 	"log"
+	"math/rand"
 	"time"
 )
 
@@ -36,6 +37,7 @@ func initProducer() {
 	config.Producer.RequiredAcks = sarama.WaitForLocal // only wait for leader to ack
 	config.Producer.Compression = sarama.CompressionSnappy
 	config.Producer.Flush.Frequency = 500 * time.Millisecond
+	config.Producer.Partitioner = sarama.NewManualPartitioner
 
 	var err error
 	producer, err = sarama.NewAsyncProducer(brokerList, config)
@@ -69,9 +71,21 @@ func initConsumer() {
 
 // Publish .. publish a message to the kafka server using the tag and message provided.
 func Publish(topic string, msg []byte) {
+	partitions, err := consumer.Partitions(topic)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	rand.Seed(int64(time.Now().UTC().UnixNano()))
+
+	p := partitions[rand.Intn(len(partitions))]
+
+	fmt.Println(">>Will publish on partition: ", p)
+
 	producer.Input() <- &sarama.ProducerMessage{
-		Topic: topic,
-		Value: sarama.ByteEncoder(msg),
+		Topic:     topic,
+		Value:     sarama.ByteEncoder(msg),
+		Partition: p,
 	}
 }
 
@@ -91,6 +105,7 @@ func Subscribe(topic string, callback func(msg []byte)) {
 
 		if err != nil {
 			fmt.Println(">> ERROR: Unable to initialize ConsumerPartition for topic: ", topic)
+			fmt.Println(err)
 		}
 
 		// create goroutins to stay listening to new messages as long as the process stays up

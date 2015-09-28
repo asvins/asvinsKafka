@@ -6,13 +6,13 @@ import (
 	"testing"
 )
 
-func TestCase1(t *testing.T) {
+func TestPublishSubscribe(t *testing.T) {
 	Setup()
 	defer TearDown()
 
 	done := make(chan int)
 
-	maxMsgs := 7
+	maxMsgs := 20
 	nMsgs := 0
 
 	Subscribe("asvins_test", func(msg []byte) {
