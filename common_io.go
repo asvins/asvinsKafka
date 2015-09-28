@@ -3,21 +3,35 @@ package common_io
 import (
 	"fmt"
 	"github.com/Shopify/sarama"
+	"github.com/wvanbergen/kafka/consumergroup"
+	"github.com/wvanbergen/kazoo-go"
 	"log"
-	"math/rand"
+	"os"
+	"os/signal"
 	"time"
 )
 
 var producer sarama.AsyncProducer
-var consumer sarama.Consumer
+var consumer *consumergroup.ConsumerGroup
+var localConfig *Config
+
+//CallbackFunc is the function prototype for kafka callback on message received
+type CallbackFunc func(msg []byte)
+
+//Config to be used on io_common Setup
+type Config struct {
+	ModuleName string
+	Topics     map[string]CallbackFunc
+}
 
 // Setup must be called in order to initialize the kafka consumer and producer
 // acording to the config file
-func Setup() {
-	fmt.Println(">> Initilizing Kafka ")
+func Setup(config *Config) {
+	localConfig = config
+	fmt.Println(">> Initilizing Kafka for module", localConfig.ModuleName)
 	initProducer()
 	initConsumer()
-	fmt.Println(">> Done!")
+	fmt.Println(">> Kafka initialization Done!")
 }
 
 // TearDown must be called to properly close all Kafka connections
@@ -26,12 +40,16 @@ func TearDown() {
 		fmt.Println(">> Unable to close Kafka Producer")
 	}
 
-	if err := consumer.Close(); err != nil {
-		fmt.Println(">> Unbale to close Kafka Consumer")
+	if !consumer.Closed() {
+		if err := consumer.Close(); err != nil {
+			fmt.Println(">> Unable to close kafka Consumer")
+		}
 	}
+	fmt.Println(">> TearDown execution Done!")
 }
 
 func initProducer() {
+	fmt.Println(">> initProducer called")
 	brokerList := []string{"localhost:9092"}
 	config := sarama.NewConfig()
 	config.Producer.RequiredAcks = sarama.WaitForLocal // only wait for leader to ack
@@ -55,70 +73,81 @@ func initProducer() {
 	fmt.Println(">> kafka producer initialized successfully")
 }
 
-func initConsumer() {
-	var err error
-	brokerList := []string{"localhost:9092"}
-	config := sarama.NewConfig()
-
-	consumer, err = sarama.NewConsumer(brokerList, config)
-
-	if err != nil {
-		log.Fatalln("Failed to start KAFKA consumer", err)
+func getTopicsKey() []string {
+	topics := make([]string, 0, len(localConfig.Topics))
+	for k := range localConfig.Topics {
+		topics = append(topics, k)
 	}
 
+	return topics
+}
+
+func handleSignalInterrupt() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+
+		TearDown()
+		os.Exit(1)
+	}()
+}
+
+func handleConsumerErrors() {
+	go func() {
+		for err := range consumer.Errors() {
+			fmt.Println(err)
+		}
+	}()
+}
+
+func handleMessages() {
+	for message := range consumer.Messages() {
+		//execute the callback as as goroutine
+		go localConfig.Topics[message.Topic](message.Value)
+
+		consumer.CommitUpto(message)
+	}
+}
+
+func initConsumer() {
+	var err error
+	fmt.Println(">> initConsumer called")
+	broker := "localhost:2181" //ZOOKEPER CONNECTION... NOT KAFKA
+	config := consumergroup.NewConfig()
+	config.Offsets.Initial = sarama.OffsetNewest
+	config.Offsets.ProcessingTimeout = 10 * time.Second
+
+	var zookeeperNodes []string
+	zookeeperNodes, config.Zookeeper.Chroot = kazoo.ParseConnectionString(broker)
+
+	if topicsSize := len(localConfig.Topics); topicsSize != 0 {
+
+		topics := getTopicsKey()
+
+		// Creates a new consumer and adds it to the consumer group
+		consumer, err = consumergroup.JoinConsumerGroup(localConfig.ModuleName, topics, zookeeperNodes, config)
+
+		if err != nil {
+			log.Fatalln(">> Failed to start KAFKA Consumer Group\nErr:", err)
+		}
+
+		// handle signal interrupt(ctrl-c)
+		handleSignalInterrupt()
+
+		// handle consumer.Errors channel
+		handleConsumerErrors()
+
+		// start goroutine to handle incoming messages
+		go handleMessages()
+	}
 	fmt.Println(">> kafka consumer initialized successfully")
 }
 
 // Publish .. publish a message to the kafka server using the tag and message provided.
 func Publish(topic string, msg []byte) {
-	partitions, err := consumer.Partitions(topic)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	rand.Seed(int64(time.Now().UTC().UnixNano()))
-
-	p := partitions[rand.Intn(len(partitions))]
-
-	fmt.Println(">>Will publish on partition: ", p)
-
 	producer.Input() <- &sarama.ProducerMessage{
-		Topic:     topic,
-		Value:     sarama.ByteEncoder(msg),
-		Partition: p,
-	}
-}
-
-// Subscribe .. subscribe to a kafka topic.
-// the callback parameter is the function to be executed for the message received.
-func Subscribe(topic string, callback func(msg []byte)) {
-	partitions, err := consumer.Partitions(topic)
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	fmt.Printf("Partitions for topic %s: are %d\n", topic, partitions)
-
-	for _, p := range partitions {
-		c, err := consumer.ConsumePartition(topic, p, sarama.OffsetNewest)
-
-		if err != nil {
-			fmt.Println(">> ERROR: Unable to initialize ConsumerPartition for topic: ", topic)
-			fmt.Println(err)
-		}
-
-		// create goroutins to stay listening to new messages as long as the process stays up
-		go func() {
-			for {
-				select {
-				case message := <-c.Messages():
-					callback(message.Value)
-
-				case err := <-c.Errors():
-					fmt.Println(err)
-				}
-			}
-		}()
+		Topic: topic,
+		Value: sarama.ByteEncoder(msg),
 	}
 }

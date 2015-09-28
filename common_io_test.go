@@ -7,15 +7,13 @@ import (
 )
 
 func TestPublishSubscribe(t *testing.T) {
-	Setup()
-	defer TearDown()
-
 	done := make(chan int)
 
 	maxMsgs := 20
 	nMsgs := 0
 
-	Subscribe("asvins_test", func(msg []byte) {
+	topics := make(map[string]CallbackFunc)
+	topics["asvins_test"] = func(msg []byte) {
 		fmt.Println("Message from TEST: ", string(msg))
 		nMsgs++
 
@@ -23,7 +21,15 @@ func TestPublishSubscribe(t *testing.T) {
 			fmt.Println(">> All messages were received.. DONE!")
 			done <- 1
 		}
-	})
+	}
+
+	c := &Config{
+		ModuleName: "testPublishSubscribe",
+		Topics:     topics,
+	}
+
+	Setup(c)
+	defer TearDown()
 
 	for i := 0; i < maxMsgs; i++ {
 		Publish("asvins_test", []byte("Execution test"+strconv.Itoa(i+1)))
