@@ -1,0 +1,6 @@
+; common_io config file
+[kafka]
+brokerlist = 127.0.0.1:9092
+
+[zookeeper]
+addrlist = 127.0.0.1:2181

@@ -23,10 +23,12 @@ func TestPublishSubscribe(t *testing.T) {
 		}
 	}
 
-	c := &Config{
-		ModuleName: "testPublishSubscribe",
-		Topics:     topics,
+	c, err := LoadConfig()
+	if err != nil {
+		t.Error(err)
 	}
+	c.ModuleName = "testPublishSubscribe"
+	c.Topics = topics
 
 	Setup(c)
 	defer TearDown()

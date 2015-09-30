@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/wvanbergen/kafka/consumergroup"
-	"github.com/wvanbergen/kazoo-go"
 	"log"
 	"os"
 	"os/signal"
@@ -14,15 +13,6 @@ import (
 var producer sarama.AsyncProducer
 var consumer *consumergroup.ConsumerGroup
 var localConfig *Config
-
-//CallbackFunc is the function prototype for kafka callback on message received
-type CallbackFunc func(msg []byte)
-
-//Config to be used on io_common Setup
-type Config struct {
-	ModuleName string
-	Topics     map[string]CallbackFunc
-}
 
 // Setup must be called in order to initialize the kafka consumer and producer
 // acording to the config file
@@ -50,7 +40,7 @@ func TearDown() {
 
 func initProducer() {
 	fmt.Println(">> initProducer called")
-	brokerList := []string{"localhost:9092"}
+	brokerList := localConfig.Kafka.BrokerList
 	config := sarama.NewConfig()
 	config.Producer.RequiredAcks = sarama.WaitForLocal // only wait for leader to ack
 	config.Producer.Compression = sarama.CompressionSnappy
@@ -112,20 +102,17 @@ func handleMessages() {
 func initConsumer() {
 	var err error
 	fmt.Println(">> initConsumer called")
-	broker := "localhost:2181" //ZOOKEPER CONNECTION... NOT KAFKA
+	zookeeperAddrs := localConfig.Zookeeper.AddrList
 	config := consumergroup.NewConfig()
 	config.Offsets.Initial = sarama.OffsetNewest
 	config.Offsets.ProcessingTimeout = 10 * time.Second
-
-	var zookeeperNodes []string
-	zookeeperNodes, config.Zookeeper.Chroot = kazoo.ParseConnectionString(broker)
 
 	if topicsSize := len(localConfig.Topics); topicsSize != 0 {
 
 		topics := getTopicsKey()
 
 		// Creates a new consumer and adds it to the consumer group
-		consumer, err = consumergroup.JoinConsumerGroup(localConfig.ModuleName, topics, zookeeperNodes, config)
+		consumer, err = consumergroup.JoinConsumerGroup(localConfig.ModuleName, topics, zookeeperAddrs, config)
 
 		if err != nil {
 			log.Fatalln(">> Failed to start KAFKA Consumer Group\nErr:", err)
