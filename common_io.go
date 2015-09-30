@@ -40,7 +40,7 @@ func TearDown() {
 		fmt.Println(">> Unable to close Kafka Producer")
 	}
 
-	if !consumer.Closed() {
+	if consumer != nil && !consumer.Closed() {
 		if err := consumer.Close(); err != nil {
 			fmt.Println(">> Unable to close kafka Consumer")
 		}
