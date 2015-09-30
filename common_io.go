@@ -55,7 +55,6 @@ func initProducer() {
 	config.Producer.RequiredAcks = sarama.WaitForLocal // only wait for leader to ack
 	config.Producer.Compression = sarama.CompressionSnappy
 	config.Producer.Flush.Frequency = 500 * time.Millisecond
-	config.Producer.Partitioner = sarama.NewManualPartitioner
 
 	var err error
 	producer, err = sarama.NewAsyncProducer(brokerList, config)
