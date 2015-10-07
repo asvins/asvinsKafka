@@ -2,12 +2,13 @@ package common_io
 
 import (
 	"fmt"
-	"github.com/Shopify/sarama"
-	"github.com/wvanbergen/kafka/consumergroup"
 	"log"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/Shopify/sarama"
+	"github.com/wvanbergen/kafka/consumergroup"
 )
 
 var producer sarama.AsyncProducer
@@ -18,6 +19,7 @@ var localConfig *Config
 // acording to the config file
 func Setup(config *Config) {
 	localConfig = config
+	fmt.Println(">> Configs: ", localConfig.Kafka.BrokerList, " - ", localConfig.Zookeeper.AddrList)
 	fmt.Println(">> Initilizing Kafka for module", localConfig.ModuleName)
 	initProducer()
 	initConsumer()
