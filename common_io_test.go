@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+
+	"github.com/asvins/utils/config"
 )
 
 func TestPublishSubscribe(t *testing.T) {
@@ -22,15 +24,15 @@ func TestPublishSubscribe(t *testing.T) {
 			done <- 1
 		}
 	}
-
-	c, err := LoadConfig()
+	c := Config{}
+	err := config.Load("common_io_config.gcfg", &c)
 	if err != nil {
 		t.Error(err)
 	}
 	c.ModuleName = "testPublishSubscribe"
 	c.Topics = topics
 
-	Setup(c)
+	Setup(&c)
 	defer TearDown()
 
 	for i := 0; i < maxMsgs; i++ {
