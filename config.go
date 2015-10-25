@@ -9,8 +9,10 @@ type Config struct {
 	Topics     map[string]CallbackFunc
 	Kafka      struct {
 		BrokerList []string
+		MaxRetry   int
 	}
 	Zookeeper struct {
 		AddrList []string
+		MaxRetry int
 	}
 }

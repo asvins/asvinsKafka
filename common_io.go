@@ -11,9 +11,11 @@ import (
 	"github.com/wvanbergen/kafka/consumergroup"
 )
 
-var producer sarama.AsyncProducer
-var consumer *consumergroup.ConsumerGroup
-var localConfig *Config
+var (
+	producer    sarama.AsyncProducer
+	consumer    *consumergroup.ConsumerGroup
+	localConfig *Config
+)
 
 // Setup must be called in order to initialize the kafka consumer and producer
 // acording to the config file
@@ -49,9 +51,17 @@ func initProducer() {
 	config.Producer.Flush.Frequency = 500 * time.Millisecond
 
 	var err error
-	producer, err = sarama.NewAsyncProducer(brokerList, config)
+	for currConnAttempt := 0; currConnAttempt < localConfig.Kafka.MaxRetry; currConnAttempt++ {
+		producer, err = sarama.NewAsyncProducer(brokerList, config)
+		if err == nil {
+			break
+		}
+		fmt.Println("[INFO] Connection attempt faild (", (currConnAttempt + 1), "/", localConfig.Kafka.MaxRetry, ")")
+		<-time.After(time.Second * 5)
+	}
+
 	if err != nil {
-		log.Fatalln("Faild to start KAFKA producer", err)
+		log.Fatal("[ERROR] Unable to setup kafka producer", err)
 	}
 
 	//You must read from the Errors() channel or the producer will deadlock.
@@ -113,8 +123,15 @@ func initConsumer() {
 
 		topics := getTopicsKey()
 
-		// Creates a new consumer and adds it to the consumer group
-		consumer, err = consumergroup.JoinConsumerGroup(localConfig.ModuleName, topics, zookeeperAddrs, config)
+		for currConnAttempt := 0; currConnAttempt < localConfig.Zookeeper.MaxRetry; currConnAttempt++ {
+			// Creates a new consumer and adds it to the consumer group
+			consumer, err = consumergroup.JoinConsumerGroup(localConfig.ModuleName, topics, zookeeperAddrs, config)
+			if err == nil {
+				break
+			}
+			fmt.Println("[INFO] Connection attempt faild (", (currConnAttempt + 1), "/", localConfig.Zookeeper.MaxRetry, ")")
+			<-time.After(time.Second * 5)
+		}
 
 		if err != nil {
 			log.Fatalln(">> Failed to start KAFKA Consumer Group\nErr:", err)
