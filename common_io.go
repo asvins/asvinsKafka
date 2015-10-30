@@ -22,7 +22,7 @@ var (
 func Setup(config *Config) {
 	localConfig = config
 	fmt.Println(">> Configs: ", localConfig.Kafka.BrokerList, " - ", localConfig.Zookeeper.AddrList)
-	fmt.Println(">> Initilizing Kafka for module", localConfig.ModuleName)
+	fmt.Println(">> Initilizing Kafka for module", localConfig.ModuleName.Value)
 	initProducer()
 	initConsumer()
 	fmt.Println(">> Kafka initialization Done!")
@@ -125,7 +125,7 @@ func initConsumer() {
 
 		for currConnAttempt := 0; currConnAttempt < localConfig.Zookeeper.MaxRetry; currConnAttempt++ {
 			// Creates a new consumer and adds it to the consumer group
-			consumer, err = consumergroup.JoinConsumerGroup(localConfig.ModuleName, topics, zookeeperAddrs, config)
+			consumer, err = consumergroup.JoinConsumerGroup(localConfig.ModuleName.Value, topics, zookeeperAddrs, config)
 			if err == nil {
 				break
 			}

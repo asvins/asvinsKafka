@@ -29,8 +29,11 @@ func TestPublishSubscribe(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	c.ModuleName = "testPublishSubscribe"
 	c.Topics = topics
+
+	if c.ModuleName.value == "" {
+		t.Error("No modulename given")
+	}
 
 	Setup(&c)
 	defer TearDown()

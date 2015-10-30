@@ -18,9 +18,6 @@ Library that wraps sarama/kafka on high-level producer and consumer for the Asvi
 		log.Fatal(err)
 	}
 
-	// ModuleName will be used to create a consumer within the consumergroup with name=Modulename
-	// in this case, the consumer group with name notification
-	cfg.ModuleName = "notification"
 	cfg.Topics = topics
 
 	// Setup will initialize the producer and consumer
@@ -32,13 +29,17 @@ Library that wraps sarama/kafka on high-level producer and consumer for the Asvi
 ```
 Below is an example of a common_io_config.gcfg
 
+	[config]
+	modulename = exampleOne
+
 	[kafka]
-	brokerlist = localhost:9092
+	brokerlist = 127.0.0.1:9092
 	maxretry = 5
 
 	[zookeeper]
-	addrlist = localhost:2181
+	addrlist = 127.0.0.1:2181
 	maxretry = 5
+
 
 ## Publish
 ```go

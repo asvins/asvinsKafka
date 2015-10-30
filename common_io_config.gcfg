@@ -1,4 +1,7 @@
 ; common_io config file
+[config]
+modulename = exampleOne
+
 [kafka]
 brokerlist = 127.0.0.1:9092
 maxretry = 5
