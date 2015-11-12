@@ -2,35 +2,42 @@
 
 Library that wraps sarama/kafka on high-level producer and consumer for the Asvins project
 
+## Build status
+![Build Status](https://travis-ci.org/asvins/common_io.svg)
+
+
 # Usage
-## Config/Subscribe
+## Config/Consumer listen
 ```go
 	...
-	// for each topic, there is a callback registerd to be executed when a message arrives.
-	topics := make(map[string]common_io.CallbackFunc)
-	// when there is a publish on the topic 'send_mail', the callback mailer.SendMail will be called
-	topics["send_mail"] = mailer.SendMail
-
 	cfg := common_io.Config{}
-	// The configurations must be in a config file .gcfg
 	err := config.Load("common_io_config.gcfg", &cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	cfg.Topics = topics
+	// Producer
+	producer, err = common_io.NewProducer(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// Setup will initialize the producer and consumer
-	common_io.Setup(&cfg)
+	defer producer.TearDown()
 
-	// TearDown will greacefully shutdown the consumer and producer created
-	defer common_io.TearDown()
+	// Consumer
+	consumer = common_io.NewConsumer(cfg)
+	consumer.HandleTopic("send_mail", mailer.SendMail)
+	if err = consumer.StartListening(); err != nil {
+		log.Fatal(err)
+	}
+
+	defer consumer.TearDown()
 	...
 ```
 Below is an example of a common_io_config.gcfg
 
-	[config]
-	modulename = exampleOne
+	[modulename]
+	value = notification
 
 	[kafka]
 	brokerlist = 127.0.0.1:9092
@@ -44,10 +51,6 @@ Below is an example of a common_io_config.gcfg
 ## Publish
 ```go
 	...
-	// Register the handler for the /api/mailTest route
-	r.AddRoute("/api/mailTest", router.GET, func(w http.ResponseWriter, r *http.Request) {
-		// mailer is a package that uses SMTP to send email
-		// Mail is a simple struct used by this package to send formatted emails
 		m := mailer.Mail{
 			To:      []string{"asvins.poli@gmail.com"},
 			Subject: "Test from Asvins server",
@@ -56,13 +59,10 @@ Below is an example of a common_io_config.gcfg
 
 		b, err := json.Marshal(&m)
 		if err != nil {
-			fmt.Fprintf(w, err.Error())
-			return
+			return errors.BadRequest(err.Error())
 		}
-		// The publish method is a wrapper for the asyncProducer of apache-kafka.
-		// It will send a message(json []byte from the mailer.Mail struct) to the topic send_mail. 
-		common_io.Publish("send_mail", b)
-	})
+
+		producer.Publish("send_mail", b)
 	...
 ```
 ## Subscribe
