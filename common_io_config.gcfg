@@ -1,6 +1,6 @@
 ; common_io config file
-[config]
-modulename = exampleOne
+[modulename]
+value = exampleOne
 
 [kafka]
 brokerlist = 127.0.0.1:9092
