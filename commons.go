@@ -16,6 +16,8 @@ const (
 	EVENT_DELETED
 )
 
+const DEAD_LETTER = "dead_letter"
+
 /*
 *	BuildTopicFromCommonEvent builds the topic string for the common event:
 *		EVENT_CREATED, EVENT_UPDATED, EVENT_DELETED
@@ -41,7 +43,7 @@ func BuildTopicFromCommonEvent(event int, prefix string) (string, error) {
 *	Dead letters
  */
 
-func doHandleDeadLetter(done chan bool, f CallbackFunc, timeout int) func(msg []byte) {
+func doHandleDeadLetter(done chan bool, f CallbackFunc, frequency int) func(msg []byte) {
 	stillWorking := make(chan bool)
 
 	go func() {
@@ -51,7 +53,7 @@ func doHandleDeadLetter(done chan bool, f CallbackFunc, timeout int) func(msg []
 				fmt.Println("[INFO] DeadLetter Reader still has work to do")
 				break
 
-			case <-time.After(time.Second * time.Duration(timeout)):
+			case <-time.After(time.Minute * time.Duration(frequency)):
 				fmt.Println("[INFO] DeadLetter Reader is Done")
 				done <- true
 				return
@@ -75,14 +77,12 @@ func HandleDeadLetter(cfg Config, topic string, f CallbackFunc) {
 			fmt.Println("[ERROR] ", err.Error())
 		}
 		<-done
-		fmt.Println("[INFO] Will TearDown()")
 		dlc.TearDown()
 	}
 
 	for {
 		select {
-		case <-time.After(time.Second * time.Duration(cfg.Deadletters.Frequency)):
-			fmt.Println("[INFO] Will execute fliste()")
+		case <-time.After(time.Minute * time.Duration(cfg.Deadletters.Frequency)):
 			go flisten()
 			break
 		}

@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -166,6 +167,12 @@ type Consumer struct {
  */
 func NewConsumer(config Config) *Consumer {
 	fmt.Println("[INFO] NewConsumer() called")
+
+	// guarantee that dead_letter frequency != 0
+	if config.Deadletters.Frequency == 0 {
+		config.Deadletters.Frequency = 30
+	}
+
 	c := &Consumer{consumer: nil, config: config, callbacks: make(map[string]CallbackFunc), id: CreatedConsumersLength()}
 	consumers[consIndex] = c
 	consIndex++
@@ -173,10 +180,13 @@ func NewConsumer(config Config) *Consumer {
 }
 
 /*
-*	HandleTopic adds a callback to the given topic
+*	HandleTopic adds a callback to the given topic and create the topic dead_letter listener
  */
 func (c *Consumer) HandleTopic(topic string, callback CallbackFunc) {
 	c.callbacks[topic] = callback
+	if !strings.Contains(topic, DEAD_LETTER) {
+		go HandleDeadLetter(c.config, topic, callback)
+	}
 }
 
 /*
