@@ -9,3 +9,6 @@ maxretry = 5
 [zookeeper]
 addrlist = 127.0.0.1:2181
 maxretry = 5
+
+[deadletters]
+frequency = 10

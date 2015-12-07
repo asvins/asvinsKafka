@@ -13,4 +13,8 @@ type Config struct {
 		AddrList []string
 		MaxRetry int
 	}
+
+	Deadletters struct {
+		Frequency int
+	}
 }

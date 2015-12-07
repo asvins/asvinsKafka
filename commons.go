@@ -1,6 +1,11 @@
 package common_io
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"runtime"
+	"time"
+)
 
 /*
 *	Common events
@@ -30,4 +35,58 @@ func BuildTopicFromCommonEvent(event int, prefix string) (string, error) {
 	}
 
 	return prefix + sufix, nil
+}
+
+/*
+*	Dead letters
+ */
+
+func doHandleDeadLetter(done chan bool, f CallbackFunc, timeout int) func(msg []byte) {
+	stillWorking := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case <-stillWorking:
+				fmt.Println("[INFO] DeadLetter Reader still has work to do")
+				break
+
+			case <-time.After(time.Second * time.Duration(timeout)):
+				fmt.Println("[INFO] DeadLetter Reader is Done")
+				done <- true
+				return
+			}
+		}
+	}()
+
+	return func(msg []byte) {
+		stillWorking <- true
+		f(msg)
+	}
+}
+func HandleDeadLetter(cfg Config, topic string, f CallbackFunc) {
+	flisten := func() {
+		dlc := NewConsumer(cfg)
+
+		done := make(chan bool)
+		dlc.HandleTopic(topic+"_dead_letter", doHandleDeadLetter(done, f, cfg.Deadletters.Frequency/2))
+
+		if err := dlc.StartListening(); err != nil {
+			fmt.Println("[ERROR] ", err.Error())
+		}
+		<-done
+		fmt.Println("[INFO] Will TearDown()")
+		dlc.TearDown()
+	}
+
+	for {
+		select {
+		case <-time.After(time.Second * time.Duration(cfg.Deadletters.Frequency)):
+			fmt.Println("[INFO] Will execute fliste()")
+			go flisten()
+			break
+		}
+		fmt.Println("[INFO] Number of current active goroutines: ", runtime.NumGoroutine())
+	}
+
 }
