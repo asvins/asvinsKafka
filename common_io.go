@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -83,6 +82,8 @@ func NewProducer(config Config) (*Producer, error) {
 *	Publish a message into a topic. Will create the topic if it doesn't exist
  */
 func (p *Producer) Publish(topic string, msg []byte) {
+	fmt.Println("[INFO] Publish on topic: ", topic)
+	fmt.Println("[INFO] msg: ", string(msg))
 	p.producer.Input() <- &sarama.ProducerMessage{
 		Topic: topic,
 		Value: sarama.ByteEncoder(msg),
@@ -184,9 +185,9 @@ func NewConsumer(config Config) *Consumer {
  */
 func (c *Consumer) HandleTopic(topic string, callback CallbackFunc) {
 	c.callbacks[topic] = callback
-	if !strings.Contains(topic, DEAD_LETTER) {
-		go HandleDeadLetter(c.config, topic, callback)
-	}
+	//if !strings.Contains(topic, DEAD_LETTER) {
+	//	go HandleDeadLetter(c.config, topic, callback)
+	//}
 }
 
 /*
@@ -276,6 +277,7 @@ func (c *Consumer) handleMessages() {
 			log.Printf("Unexpected offset on %s:%d. Expected %d, found %d, diff %d.\n", message.Topic, message.Partition, offsets[message.Topic][message.Partition]+1, message.Offset, message.Offset-offsets[message.Topic][message.Partition]+1)
 		}
 
+		fmt.Println("[INFO] Consuming from topic: ", message.Topic)
 		c.callbacks[message.Topic](message.Value)
 
 		offsets[message.Topic][message.Partition] = message.Offset
