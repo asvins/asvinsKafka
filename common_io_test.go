@@ -167,6 +167,7 @@ func (cc *counter) inc() {
 	defer cc.mu.Unlock()
 
 	cc.count++
+	fmt.Println("[INFO] new count = ", cc.count)
 }
 
 func TestConsumerGroup(t *testing.T) {
@@ -221,6 +222,64 @@ func TestConsumerGroup(t *testing.T) {
 		}
 
 		fmt.Println("-- TestConsumerGroup end --\n")
+	} else {
+		fmt.Println("[INFO] -- Kafka Down.. Skipping TestConsumerGroup --\n")
+	}
+}
+
+func TestConsumerGroup2(t *testing.T) {
+	if kafka_up == "TRUE" {
+		fmt.Println("-- TestConsumerGroup2 start --")
+
+		fmt.Println("[INFO] If 2 c groups are created, only one of them should receive each message")
+
+		prod, err := NewProducer(c)
+		if err != nil {
+			t.Error(err)
+		}
+
+		msgCount := &counter{0, sync.Mutex{}}
+
+		consumer1 := NewConsumer(c)
+		c.ModuleName.Value = "another"
+		consumer2 := NewConsumer(c)
+
+		defer prod.TearDown()
+		defer consumer1.TearDown()
+		defer consumer2.TearDown()
+
+		// Add callbacks to consumer1
+		consumer1.HandleTopic("asvins_test2", func(msg []byte) {
+			fmt.Println("Consumer1: ", string(msg))
+			msgCount.inc()
+		})
+
+		//Add callbacks to consumer2
+		consumer2.HandleTopic("asvins_test2", func(msg []byte) {
+			fmt.Println("Consumer2: ", string(msg))
+			msgCount.inc()
+		})
+
+		err = consumer1.StartListening()
+		if err != nil {
+			t.Error(err)
+		}
+
+		err = consumer2.StartListening()
+		if err != nil {
+			t.Error(err)
+		}
+
+		// Publish a message
+		prod.Publish("asvins_test2", []byte("Execution test"))
+
+		<-time.After(time.Second * 5)
+
+		if msgCount.count != 2 {
+			t.Error("[ERROR] Message should have been listened 2 times. Got", msgCount.count)
+		}
+
+		fmt.Println("-- TestConsumerGroup2 end --\n")
 	} else {
 		fmt.Println("[INFO] -- Kafka Down.. Skipping TestConsumerGroup --\n")
 	}
